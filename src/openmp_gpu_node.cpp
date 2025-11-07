@@ -35,17 +35,27 @@ private:
             b[i] = static_cast<float>(i * 2);
         }
 
+        // --- 修正箇所 1 ---
+        // データポインタをローカル変数 (lvalue) に格納する
+        float* a_ptr = a.data();
+        float* b_ptr = b.data();
+        float* c_ptr = c.data();
+
         RCLCPP_INFO(this->get_logger(), "Performing vector addition on the GPU...");
 
         // Offload computation to the GPU
-        #pragma omp target teams distribute parallel for map(to:a.data()[0:n], b.data()[0:n]) map(from:c.data()[0:n])
+        // --- 修正箇所 2 ---
+        // map節でローカル変数のポインタを使用する
+        #pragma omp target teams distribute parallel for map(to:a_ptr[0:n], b_ptr[0:n]) map(from:c_ptr[0:n])
         for (int i = 0; i < n; ++i) {
-            c[i] = a[i] + b[i];
+            // --- 修正箇所 3 ---
+            // デバイス上のループ内でもポインタを使用する
+            c_ptr[i] = a_ptr[i] + b_ptr[i];
         }
 
         RCLCPP_INFO(this->get_logger(), "Computation finished.");
 
-        // Verification
+        // Verification (ここはホスト側で実行されるため、元の 'c[i]' のままで問題ない)
         bool success = true;
         for (int i = 0; i < 5; ++i) { // Check first 5 elements
              RCLCPP_INFO(this->get_logger(), "c[%d] = %f", i, c[i]);
